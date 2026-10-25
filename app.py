@@ -39,7 +39,7 @@ if uploaded_files:
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Обработка: {uploaded_file.name} ({idx+1}/{len(uploaded_files)})")
                 
-                # Читаем файл в память один раз (оптимизация ввода-вывода)
+                # Читаем файл в memory один раз
                 file_bytes_data = uploaded_file.read()
                 file_bytes = np.asarray(bytearray(file_bytes_data), dtype=np.uint8)
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
@@ -50,11 +50,10 @@ if uploaded_files:
                     # Срез нижней области экрана, где всплывают уведомления плашек
                     crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
                     
-                    # Увеличение картинки в 3 раза (чтобы Tesseract лучше видел мелкий шрифт плашек)
+                    # Увеличение картинки в 3 раза
                     crop_large = cv2.resize(crop_center_bottom, (0, 0), fx=3.0, fy=3.0, interpolation=cv2.INTER_LINEAR)
                     
-                    # Цветовой фильтр: выделяем белый цвет букв. 
-                    # Порог снижен до 180, чтобы буквы оставались жирными и читаемыми
+                    # Цветовой фильтр: выделяем белый цвет букв. Порог 180-255
                     lower_white = np.array([180, 180, 180], dtype=np.uint8)
                     upper_white = np.array([255, 255, 255], dtype=np.uint8)
                     thresh = cv2.inRange(crop_large, lower_white, upper_white)
@@ -62,15 +61,10 @@ if uploaded_files:
                     # Инвертируем маску (делаем текст черным на белом фоне)
                     thresh_inverted = cv2.bitwise_not(thresh)
                     
-                    # Настройка Tesseract: 
-                    # PSM 7 — читать как одну строку текста (идеально для уведомлений)
-                    # Whitelist — разрешаем только русские буквы, цифры, пробел и знаки ID/денег
-                    custom_config = (
-                        r'--oem 3 --psm 7 '
-                        r'-c tessedit_char_whitelist=абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789#$ '
-                    )
+                    # Настройка Tesseract: PSM 7 (одна строка). Whitelist удален из-за ошибки кириллицы
+                    custom_config = r'--oem 3 --psm 7'
                     
-                    # Распознаем строго русский текст, убирая английский «мусор»
+                    # Распознаем строго русский текст
                     text = pytesseract.image_to_string(thresh_inverted, lang='rus', config=custom_config).lower()
                     
                     target_folder = "Другое"
