@@ -5,18 +5,23 @@ import pytesseract
 import zipfile
 import io
 import os
+import requests
+import base64
 
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-st.set_page_config(page_title="Majestic RP Сортировщик EMS PRO", page_icon="📸")
+st.set_page_config(page_title="Majestic RP Сортировщик Yandex AI", page_icon="📸")
 
-st.title("📸 Сортировщик скриншотов Majestic RP (EMS PRO)")
-st.write("Загрузите скриншоты, и сайт разложит их по папкам внутри ZIP-архива.")
+st.title("📸 Сортировщик скриншотов Majestic RP (Yandex AI)")
+st.write("Сайт автоматически сортирует скриншоты. Ошибки сканера исправляет искусственный интеллект Яндекса.")
 
-# Ключевые слова, настроенные под гарантированное чтение на русском языке
+# ВШИТЫЕ ДАННЫЕ ВАШЕГО АККАУНТА YANDEX CLOUD
+FOLDER_ID = "b1gup39u1sf9n94ui1fj"
+YANDEX_KEY = "AQVN1Sp-chxZjkBxH8PllyCcME4HnH-F1Nj-onX3"
+
 FOLDERS = {
-    "Мед_Справки": ["выдали", "справк", "справ", "псих", "физ"],
-    "Лечение": ["вылечили", "вылеч", "лече"],
+    "Мед_Справки": ["выдали", "справк", "справ", "псих", "физ", "спра"],
+    "Лечение": ["вылечили", "вылеч", "лече", "лечи", "таблет", "пе о", "пео"],
     "Реанимация": ["реанимировали", "реаним", "реани", "спасение", "спасен"],
     "Вакцинация": ["вакцинировали", "вакцин", "вакци", "привив"]
 }
@@ -25,14 +30,14 @@ uploaded_files = st.file_uploader("Перетащите скриншоты сю�
                                   type=["png", "jpg", "jpeg"], 
                                   accept_multiple_files=True)
 
-show_debug = st.checkbox("Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
+show_debug = st.checkbox("Показать отчет о работе Yandex AI (поможет найти ошибки)")
 
 if uploaded_files:
-    if st.button("🚀 Начать точную сортировку"):
+    if st.button("🚀 Начать умную сортировку"):
         zip_buffer = io.BytesIO()
         progress_bar = st.progress(0)
         status_text = st.empty()
-        debug_logs = []
+        ai_logs = []
         
         with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
             for idx, uploaded_file in enumerate(uploaded_files):
@@ -41,29 +46,75 @@ if uploaded_files:
                 file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
                 
+                target_folder = "Другое"
+                
                 if img is not None:
                     h, w, _ = img.shape
                     
-                    # Суженный и центрированный срез (отсекаем худ чата слева и бинды справа)
+                    # Точный срез центральной нижней части экрана
                     crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
-                    
-                    # Подготовка картинки к распознаванию
-                    gray = cv2.cvtColor(crop_center_bottom, cv2.COLOR_BGR2GRAY)
+                    gray = cv2.cvtColor(crop_center_bottom, BGR2GRAY)
                     gray_large = cv2.resize(gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
                     _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
-                    # ВАЖНО: lang='rus' (строго русский язык, без примеси английских букв)
                     custom_config = r'--oem 3 --psm 6'
-                    text = pytesseract.image_to_string(thresh, lang='rus', config=custom_config).lower()
+                    text = pytesseract.image_to_string(thresh, lang='rus', config=custom_config).lower().strip()
                     
-                    target_folder = "Другое"
+                    # 1. Быстрый поиск по чистым ключам
                     for folder, keywords in FOLDERS.items():
                         if any(keyword in text for keyword in keywords):
                             target_folder = folder
                             break
                     
+                    # 2. Подстраховка через Яндекс ИИ, если файл летит в "Другое"
                     if target_folder == "Другое":
-                        debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{text.strip()}`")
+                        try:
+                            _, encoded_img = cv2.imencode('.jpg', crop_center_bottom)
+                            base64_image = base64.b64encode(encoded_img).decode('utf-8')
+                            
+                            url = "https://yandex.net"
+                            headers = {
+                                "Content-Type": "application/json",
+                                "Authorization": f"Api-Key {YANDEX_KEY}"
+                            }
+                            body = {
+                                "folderId": FOLDER_ID,
+                                "analyzeSpecs": [{
+                                    "content": base64_image,
+                                    "features": [{
+                                        "type": "TEXT_DETECTION",
+                                        "textDetectionConfig": {
+                                            "languageCodes": ["rus", "eng"]
+                                        }
+                                    }]
+                                }]
+                            }
+                            
+                            response = requests.post(url, headers=headers, json=body, timeout=10)
+                            result = response.json()
+                            
+                            # Собираем текст от Яндекса
+                            records = result['results']['results']['textDetection']['pages']['blocks']
+                            ai_text = ""
+                            for block in records:
+                                for line in block['lines']:
+                                    for word in line['words']:
+                                        ai_text += word['text'] + " "
+                            
+                            ai_text = ai_text.lower().strip()
+                            
+                            # Проверяем текст Яндекса
+                            for folder, keywords in FOLDERS.items():
+                                if any(keyword in ai_text for keyword in keywords):
+                                    target_folder = folder
+                                    ai_logs.append(f"🧠 **Yandex AI спас файл** `{uploaded_file.name}` -> распределил в **{target_folder}**")
+                                    break
+                                    
+                            if target_folder == "Другое":
+                                ai_logs.append(f"❌ Яндекс ИИ тоже не смог прочесть текст на `{uploaded_file.name}` (Текст: `{ai_text}`)")
+                                
+                        except Exception as e:
+                            ai_logs.append(f"⚠️ Ошибка ИИ на файле `{uploaded_file.name}`: {str(e)}")
                     
                     uploaded_file.seek(0)
                     zip_file.writestr(os.path.join(target_folder, uploaded_file.name), uploaded_file.read())
@@ -79,8 +130,8 @@ if uploaded_files:
             mime="application/zip"
         )
         
-        if show_debug and debug_logs:
+        if show_debug and ai_logs:
             st.write("---")
-            st.subheader("🔍 Анализ нераспознанных файлов:")
-            for log in debug_logs:
+            st.subheader("🤖 Отчет искусственного интеллекта Yandex:")
+            for log in ai_logs:
                 st.markdown(log)
