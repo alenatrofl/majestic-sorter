@@ -6,7 +6,6 @@ import zipfile
 import io
 import os
 
-# Настройка Tesseract для работы в облаке Linux
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 st.set_page_config(page_title="Majestic RP Сортировщик", page_icon="📸")
@@ -14,12 +13,13 @@ st.set_page_config(page_title="Majestic RP Сортировщик", page_icon="�
 st.title("📸 Сортировщик скриншотов Majestic RP")
 st.write("Загрузите скриншоты, и сайт разложит их по папкам внутри ZIP-архива.")
 
-# Ключевые слова для поиска на плашках
+# Максимально гибкие ключевые слова с учетом возможных ошибок чтения букв
 FOLDERS = {
-    "Лечение": ["вылечили"],
-    "Мед_Справки": ["выдали мед справку", "мед справку"],
-    "Реанимация": ["реанимировали", "спасение игрока"],
-    "Вакцинация": ["вакцинировали"],
+    "Лечение": ["вылечил", "вылечи", "лечен", "лече"],
+    "Мед_Справки": ["справк", "справку", "о псих", "о физ"],
+    "Мед_Карты": ["карт", "медкарт", "мед. карт", "медицинск"],
+    "Реанимация": ["реанимир", "реаним", "спасен", "реани"],
+    "Вакцинация": ["вакцин", "привив", "вакци"],
     "Другое": []
 }
 
@@ -42,8 +42,16 @@ if uploaded_files:
                 
                 if img is not None:
                     h, w, _ = img.shape
-                    crop_bottom = img[int(h*0.85):h, 0:w]
-                    text = pytesseract.image_to_string(crop_bottom, lang='rus+eng').lower()
+                    
+                    # Захватываем нижнюю четверть экрана (от 75% до 98% высоты), 
+                    # чтобы точно поймать плашки и не зацепить радар/полосу здоровья в самом низу
+                    crop_bottom = img[int(h*0.75):int(h*0.98), 0:w]
+                    
+                    # Улучшаем качество картинки для робота: переводим в черно-белый формат
+                    gray = cv2.cvtColor(crop_bottom, cv2.COLOR_BGR2GRAY)
+                    
+                    # Распознаем текст (ищем и на русском, и на английском)
+                    text = pytesseract.image_to_string(gray, lang='rus+eng').lower()
                     
                     target_folder = "Другое"
                     for folder, keywords in FOLDERS.items():
