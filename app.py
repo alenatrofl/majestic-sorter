@@ -8,25 +8,23 @@ import os
 
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-st.set_page_config(page_title="Majestic RP Сортировщик PRO", page_icon="📸")
+st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="📸")
 
-st.title("📸 Сортировщик скриншотов Majestic RP (PRO)")
+st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт разложит их по папкам внутри ZIP-архива.")
 
-# Ультра-гибкие ключи. Ищем даже по обрывкам слов на случай опечаток OCR
+# Самые точные и проверенные ключевые слова по вашим примерам
 FOLDERS = {
-    "Лечение": ["вылеч", "лечен", "лече", "здрав", "здоров"],
     "Мед_Справки": ["справк", "справ", "псих", "физ"],
-    "Мед_Карты": ["карт", "медкарт", "мед.карт"],
-    "Реанимация": ["реаним", "реани", "спасен", "игрок"],
-    "Вакцинация": ["вакцин", "привив", "вакци"]
+    "Лечение": ["вылечили", "вылечи"],
+    "Реанимация": ["реанимировали", "реанимир", "спасение"],
+    "Вакцинация": ["вакцинировали", "вакцин"]
 }
 
 uploaded_files = st.file_uploader("Перетащите скриншоты сюда", 
                                   type=["png", "jpg", "jpeg"], 
                                   accept_multiple_files=True)
 
-# Галочка для отладки, если захочется посмотреть, что видит робот
 show_debug = st.checkbox("Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
 
 if uploaded_files:
@@ -46,23 +44,23 @@ if uploaded_files:
                 if img is not None:
                     h, w, _ = img.shape
                     
-                    # Берем нижние 30% экрана, чтобы точно поймать плашки, если их вылезло много в ряд
-                    crop_bottom = img[int(h*0.70):int(h*0.98), 0:w]
+                    # 1. Берем нижнюю ПОЛОВИНУ экрана (от 50% до 98% высоты)
+                    # 2. Отрезаем левую треть (чат) и правую треть (меню бинда), берем центр от 30% до 70% ширины
+                    crop_center_bottom = img[int(h*0.50):int(h*0.98), int(w*0.30):int(w*0.70)]
                     
-                    # Переводим в серое изображение
-                    gray = cv2.cvtColor(crop_bottom, cv2.COLOR_BGR2GRAY)
-                    
-                    # Увеличиваем размер зоны в 1.5 раза для лучшей читаемости мелкого шрифта
+                    # Переводим в серое и увеличиваем для четкости букв
+                    gray = cv2.cvtColor(crop_center_bottom, cv2.COLOR_BGR2GRAY)
                     gray_large = cv2.resize(gray, (0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC)
                     
-                    # Продвинутый фильтр: делаем текст белым, а фон абсолютно черным (убирает шумы игры)
-                    thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+                    # Контрастный фильтр (белый текст на черном фоне)
+                    _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
-                    # Читаем текст с тонкой настройкой движка (--psm 6 считает зону как единый блок текста)
+                    # Чтение текста
                     custom_config = r'--oem 3 --psm 6'
                     text = pytesseract.image_to_string(thresh, lang='rus+eng', config=custom_config).lower()
                     
                     target_folder = "Другое"
+                    # Строгая поочередная проверка папок
                     for folder, keywords in FOLDERS.items():
                         if any(keyword in text for keyword in keywords):
                             target_folder = folder
@@ -71,10 +69,8 @@ if uploaded_files:
                     if target_folder == "Другое":
                         debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{text.strip()}`")
                     
-                    # Сохраняем оригинал
-                    archive_path = os.path.join(target_folder, uploaded_file.name)
                     uploaded_file.seek(0)
-                    zip_file.writestr(archive_path, uploaded_file.read())
+                    zip_file.writestr(os.path.join(target_folder, uploaded_file.name), uploaded_file.read())
                 
                 progress_bar.progress((idx + 1) / len(uploaded_files))
         
@@ -87,7 +83,6 @@ if uploaded_files:
             mime="application/zip"
         )
         
-        # Выводим логи отладки, если включена галочка
         if show_debug and debug_logs:
             st.write("---")
             st.subheader("🔍 Анализ нераспознанных файлов:")
