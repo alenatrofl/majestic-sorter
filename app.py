@@ -6,7 +6,6 @@ import zipfile
 import io
 import os
 
-# Путь к исполняемому файлу Tesseract (оставляем без изменений)
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="📸")
@@ -14,11 +13,11 @@ st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_ico
 st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
 
-# Сверхточный список ключевых слов, ориентированный на всплывающие уведомления
+# Сверхточный список ключевых слов, учитывающий опечатки сканера букв
 FOLDERS = {
-    "Мед_Справки": ["выдали", "справк", "справ", "псих", "физ", "спра", "ъыдали"],
-    "Лечение": ["вылечили", "вылеч", "лече", "лечи", "таблет", "табл", "лечеви"],
-    "Реанимация": ["реанимировали", "реаним", "реани", "спасение", "спасен", "игрока"],
+    "Мед_Справки": ["выдали", "справк", "справ", "псих", "физ", "спра", "спран"],
+    "Лечение": ["вылечили", "вылеч", "лече", "лечи", "таблет","лечеви"],
+    "Реанимация": ["реанимировали", "реаним", "реани", "спасение", "спасен",],
     "Вакцинация": ["вакцинировали", "вакцин", "вакци", "привив", "ваки"]
 }
 
@@ -39,33 +38,23 @@ if uploaded_files:
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Обработка: {uploaded_file.name} ({idx+1}/{len(uploaded_files)})")
                 
-                # Читаем файл в memory один раз
-                file_bytes_data = uploaded_file.read()
-                file_bytes = np.asarray(bytearray(file_bytes_data), dtype=np.uint8)
+                file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
                 
                 if img is not None:
                     h, w, _ = img.shape
                     
-                    # Срез нижней области экрана, где всплывают уведомления плашек
+                    # Суженный и центрированный срез (отсекаем чат слева и бинды справа)
                     crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
                     
-                    # Увеличение картинки в 3 раза
-                    crop_large = cv2.resize(crop_center_bottom, (0, 0), fx=3.0, fy=3.0, interpolation=cv2.INTER_LINEAR)
+                    # Подготовка картинки к распознаванию
+                    gray = cv2.cvtColor(crop_center_bottom, cv2.COLOR_BGR2GRAY)
+                    gray_large = cv2.resize(gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+                    _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
-                    # Цветовой фильтр: выделяем белый цвет букв. Порог 180-255
-                    lower_white = np.array([180, 180, 180], dtype=np.uint8)
-                    upper_white = np.array([255, 255, 255], dtype=np.uint8)
-                    thresh = cv2.inRange(crop_large, lower_white, upper_white)
-                    
-                    # Инвертируем маску (делаем текст черным на белом фоне)
-                    thresh_inverted = cv2.bitwise_not(thresh)
-                    
-                    # Настройка Tesseract: PSM 7 (одна строка). Whitelist удален из-за ошибки кириллицы
-                    custom_config = r'--oem 3 --psm 7'
-                    
-                    # Распознаем строго русский текст
-                    text = pytesseract.image_to_string(thresh_inverted, lang='rus', config=custom_config).lower()
+                    # Считываем и русский, и английский текст одновременно, чтобы не терять опечатки
+                    custom_config = r'--oem 3 --psm 6'
+                    text = pytesseract.image_to_string(thresh, lang='rus+eng', config=custom_config).lower()
                     
                     target_folder = "Другое"
                     for folder, keywords in FOLDERS.items():
@@ -74,11 +63,10 @@ if uploaded_files:
                             break
                     
                     if target_folder == "Другое":
-                        clean_text = " ".join(text.split())
-                        debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{clean_text}`")
+                        debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{text.strip()}`")
                     
-                    # Сохраняем файл в ZIP архив в соответствующую папку
-                    zip_file.writestr(os.path.join(target_folder, uploaded_file.name), file_bytes_data)
+                    uploaded_file.seek(0)
+                    zip_file.writestr(os.path.join(target_folder, uploaded_file.name), uploaded_file.read())
                 
                 progress_bar.progress((idx + 1) / len(uploaded_files))
         
