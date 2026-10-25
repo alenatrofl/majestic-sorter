@@ -8,17 +8,17 @@ import os
 
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="📸")
+st.set_page_config(page_title="Majestic RP Сортировщик EMS PRO", page_icon="📸")
 
-st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
+st.title("📸 Сортировщик скриншотов Majestic RP (EMS PRO)")
 st.write("Загрузите скриншоты, и сайт разложит их по папкам внутри ZIP-архива.")
 
-# Самые точные и проверенные ключевые слова по вашим примерам
+# Самые надежные маркеры, очищенные от мусора
 FOLDERS = {
     "Мед_Справки": ["справк", "справ", "псих", "физ"],
-    "Лечение": ["вылечили", "вылечи"],
-    "Реанимация": ["реанимировали", "реанимир", "спасение"],
-    "Вакцинация": ["вакцинировали", "вакцин"]
+    "Лечение": ["вылеч", "лечен", "лече"],
+    "Реанимация": ["реаним", "реани", "спасен", "спасени"],
+    "Вакцинация": ["вакцин", "привив", "вакци"]
 }
 
 uploaded_files = st.file_uploader("Перетащите скриншоты сюда", 
@@ -28,7 +28,7 @@ uploaded_files = st.file_uploader("Перетащите скриншоты сю�
 show_debug = st.checkbox("Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
 
 if uploaded_files:
-    if st.button("🚀 Начать сортировку"):
+    if st.button("🚀 Начать точную сортировку"):
         zip_buffer = io.BytesIO()
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -44,23 +44,23 @@ if uploaded_files:
                 if img is not None:
                     h, w, _ = img.shape
                     
-                    # 1. Берем нижнюю ПОЛОВИНУ экрана (от 50% до 98% высоты)
-                    # 2. Отрезаем левую треть (чат) и правую треть (меню бинда), берем центр от 30% до 70% ширины
-                    crop_center_bottom = img[int(h*0.50):int(h*0.98), int(w*0.30):int(w*0.70)]
+                    # ИДЕАЛЬНЫЙ СРЕЗ: 
+                    # Берём по высоте от 65% до 96% (чтобы не цеплять самый низ экрана)
+                    # По ширине строго по центру: от 35% до 65% (полностью отсекаем чат, карту и бинды справа!)
+                    crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
                     
-                    # Переводим в серое и увеличиваем для четкости букв
+                    # Переводим в серое и увеличиваем
                     gray = cv2.cvtColor(crop_center_bottom, cv2.COLOR_BGR2GRAY)
-                    gray_large = cv2.resize(gray, (0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC)
+                    gray_large = cv2.resize(gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
                     
-                    # Контрастный фильтр (белый текст на черном фоне)
+                    # Делаем жесткий контраст (белые буквы на чистом черном фоне)
                     _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
-                    # Чтение текста
+                    # Распознавание текста
                     custom_config = r'--oem 3 --psm 6'
                     text = pytesseract.image_to_string(thresh, lang='rus+eng', config=custom_config).lower()
                     
                     target_folder = "Другое"
-                    # Строгая поочередная проверка папок
                     for folder, keywords in FOLDERS.items():
                         if any(keyword in text for keyword in keywords):
                             target_folder = folder
@@ -74,7 +74,7 @@ if uploaded_files:
                 
                 progress_bar.progress((idx + 1) / len(uploaded_files))
         
-        status_text.text("✅ Сортировка завершена!")
+        status_text.text("✅ Сортировка успешно завершена!")
         
         st.download_button(
             label="📥 Скачать готовый архив (ZIP)",
