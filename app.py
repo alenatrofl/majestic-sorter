@@ -53,7 +53,7 @@ if uploaded_files:
                     
                     # Точный срез центральной нижней части экрана
                     crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
-                    gray = cv2.cvtColor(crop_center_bottom, BGR2GRAY)
+                    gray = cv2.cvtColor(crop_center_bottom, cv2.COLOR_BGR2GRAY)
                     gray_large = cv2.resize(gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
                     _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
