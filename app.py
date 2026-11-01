@@ -15,7 +15,7 @@ st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_ico
 st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
 
-# Переключатель уведомлений в сайдбаре (чтобы не мешал на главном экране)
+# Переключатель уведомлений в сайдбаре
 disable_notifications = st.sidebar.checkbox("Отключить уведомления и эффекты", value=False)
 
 # Сверхточный список ключевых слов
@@ -76,34 +76,60 @@ if uploaded_files:
         status_text.text("✅ Сортировка успешно завершена!")
         zip_buffer.seek(0)
         
-        # --- Эффекты Успеха (Dance Till You're Dead) ---
+        # --- Полностью скрытые эффекты через JavaScript ---
         if not disable_notifications:
-            # 1. Автоматически играющий бодрый звук (прямая ссылка на чистый mp3 трека)
-            audio_url = "https://soundboard.com"
-            st.audio(audio_url, format="audio/mp3", autoplay=True)
+            audio_source = "https://soundboard.com"
             
-            # 2. Визуальный диско-эффект мигающего фона через CSS-анимацию
-            disco_html = """
-            <div id="disco-overlay" style="
-                position: fixed;
-                top: 0; left: 0; width: 100vw; height: 100vh;
-                pointer-events: none; z-index: 99999; opacity: 0.25;
-                animation: discoTime 0.4s infinite alternate;
-            "></div>
-            <style>
-                @keyframes discoTime {
-                    0% { background-color: #ff00ff; }
-                    25% { background-color: #00ffff; }
-                    50% { background-color: #ffff00; }
-                    75% { background-color: #00ff00; }
-                    100% { background-color: #ff0000; }
-                }
-            </style>
+            disco_js_html = f"""
+            <script>
+                function startDanceParty() {{
+                    const mainDoc = window.parent.document;
+                    
+                    // 1. Создаем фоновую светомузыку
+                    if (!mainDoc.getElementById('disco-party-overlay')) {{
+                        const overlay = mainDoc.createElement('div');
+                        overlay.id = 'disco-party-overlay';
+                        overlay.style.position = 'fixed';
+                        overlay.style.top = '0';
+                        overlay.style.left = '0';
+                        overlay.style.width = '100vw';
+                        overlay.style.height = '100vh';
+                        overlay.style.pointerEvents = 'none';
+                        overlay.style.zIndex = '99999';
+                        overlay.style.opacity = '0.22';
+                        
+                        const style = mainDoc.createElement('style');
+                        style.innerHTML = `
+                            @keyframes discoFlash {{
+                                0% {{ background-color: #ff00ff; }}
+                                25% {{ background-color: #00ffff; }}
+                                50% {{ background-color: #ffff00; }}
+                                75% {{ background-color: #00ff00; }}
+                                100% {{ background-color: #ff0000; }}
+                            }}
+                        `;
+                        mainDoc.head.appendChild(style);
+                        overlay.style.animation = 'discoFlash 0.35s infinite alternate';
+                        mainDoc.body.appendChild(overlay);
+                        
+                        // Удаляем мигание через 8 секунд
+                        setTimeout(() => {{ overlay.remove(); }}, 8000);
+                    }}
+                    
+                    // 2. Создаем и запускаем скрытый аудиопоток
+                    const audio = new Audio('{audio_source}');
+                    audio.volume = 0.4;
+                    audio.play().catch(err => console.log("Браузер заблокировал звук:", err));
+                }}
+                
+                startDanceParty();
+            </script>
             """
-            st.components.v1.html(disco_html, height=0)
-            st.toast("🎉 Файлы проверены! ТАНЦУЮТ ВСЕ!", icon="🕺")
+            # Компактный вызов без отображения каких-либо элементов интерфейса
+            st.components.v1.html(disco_js_html, height=0, width=0)
+            st.toast("🎉 Сортировка окончена! ТАНЦУЮТ ВСЕ!", icon="🕺")
         
-        # Кнопка скачивания
+        # Кнопка скачивания архива
         st.download_button(
             label="📥 Скачать готовый архив (ZIP)",
             data=zip_buffer.getvalue(),
