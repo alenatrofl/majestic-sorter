@@ -5,7 +5,8 @@ import pytesseract
 import zipfile
 import io
 import os
-import random  # <--- Добавили модуль для выбора случайного звука
+import random
+import base64  # <--- Добавили для скрытого воспроизведения звука
 
 # Указывайте путь к tesseract, только если вы точно уверены, что он там (для Linux/Docker)
 if os.path.exists('/usr/bin/tesseract'):
@@ -15,6 +16,21 @@ st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_ico
 
 st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
+
+# --- БЛОК УПРАВЛЕНИЯ ЗВУКОМ ---
+if "play_sound" not in st.session_state:
+    st.session_state.play_sound = True  # По умолчанию звук включен
+
+# Кнопка-переключатель звука
+if st.session_state.play_sound:
+    if st.button("🔊 Уведомления: ВКЛ (Нажмите, чтобы заглушить)"):
+        st.session_state.play_sound = False
+        st.rerun()
+else:
+    if st.button("🔇 Уведомления: ВЫКЛ (Нажмите, чтобы включить)"):
+        st.session_state.play_sound = True
+        st.rerun()
+# ------------------------------
 
 # Сверхточный список ключевых слов
 FOLDERS = {
@@ -73,18 +89,29 @@ if uploaded_files:
         
         status_text.text("✅ Сортировка успешно завершена!")
         
-        # --- БЛОК ПРОИГРЫВАНИЯ СЛУЧАЙНОГО ЗВУКА ---
-        SOUNDS_DIR = "sounds"
-        if os.path.exists(SOUNDS_DIR):
-            # Ищем все аудиофайлы в папке sounds
-            sound_files = [f for f in os.listdir(SOUNDS_DIR) if f.endswith(('.mp3', '.wav', '.ogg'))]
-            if sound_files:
-                random_sound = random.choice(sound_files)
-                sound_path = os.path.join(SOUNDS_DIR, random_sound)
-                # Воспроизводим звук автоматически (скрываем сам плеер через контейнер, если нужно, 
-                # но st.audio сам по себе аккуратный)
-                st.audio(sound_path, format=f"audio/{random_sound.split('.')[-1]}", autoplay=True)
-        # ------------------------------------------
+        # --- СКРЫТОЕ ПРОИГРЫВАНИЕ СЛУЧАЙНОГО ЗВУКА ---
+        if st.session_state.play_sound:
+            SOUNDS_DIR = "sounds"
+            if os.path.exists(SOUNDS_DIR):
+                sound_files = [f for f in os.listdir(SOUNDS_DIR) if f.endswith(('.mp3', '.wav', '.ogg'))]
+                if sound_files:
+                    random_sound = random.choice(sound_files)
+                    sound_path = os.path.join(SOUNDS_DIR, random_sound)
+                    
+                    # Кодируем аудио в base64 для незаметной вставки в HTML
+                    with open(sound_path, "rb") as f:
+                        audio_bytes = f.read()
+                    audio_base64 = base64.b64encode(audio_bytes).decode()
+                    format_ext = random_sound.split('.')[-1]
+                    
+                    # Встраиваем скрытый аудио-тег с автозапуском
+                    audio_html = f"""
+                        <audio autoplay style="display:none;">
+                            <source src="data:audio/{format_ext};base64,{audio_base64}" type="audio/{format_ext}">
+                        </audio>
+                    """
+                    st.markdown(audio_html, unsafe_allow_html=True)
+        # ----------------------------------------------
         
         zip_buffer.seek(0)
         
