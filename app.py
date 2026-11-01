@@ -35,80 +35,87 @@ if os.path.exists('/usr/bin/tesseract'):
 # Конфигурация страницы
 st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="🚑", layout="centered")
 
-# --- БЛОК КАСТОМНОГО CSS ДЛЯ КРАСОЧНОГО ДИЗАЙНА ---
+# --- СТИЛЬНЫЙ И ЧИСТЫЙ CSS (СВЕТЛАЯ ТЕМА В СТИЛЕ MAJESTIC RP) ---
 st.markdown("""
     <style>
-    /* Настройка главного фона и шрифтов */
+    /* Базовые настройки приложения (чистый светлый фон) */
     .stApp {
-        background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
-        color: #f3f4f6;
+        background-color: #f8fafc;
+        color: #1e293b;
     }
     
-    /* Красивый заголовок с градиентом */
+    /* Красивый и аккуратный заголовок */
     .main-title {
-        font-size: 2.8rem !important;
-        font-weight: 800;
-        background: linear-gradient(90deg, #ef4444, #3b82f6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 2.4rem !important;
+        font-weight: 700;
+        color: #5932a6; /* Фирменный фиолетовый цвет Majestic */
         text-align: center;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.2rem;
     }
     
     .sub-title {
         text-align: center;
-        color: #9ca3af;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
+        color: #64748b;
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
     }
 
-    /* Стилизация ВСЕХ кнопок в приложении */
+    /* Стилизация всех стандартных кнопок */
     div.stButton > button {
-        border-radius: 12px !important;
-        padding: 0.6rem 1.5rem !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease-index !important;
-        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        border: 1px solid #cbd5e1 !important;
+        background-color: #ffffff !important;
+        color: #334155 !important;
+        transition: all 0.2s ease !important;
+    }
+    div.stButton > button:hover {
+        border-color: #5932a6 !important;
+        color: #5932a6 !important;
     }
 
-    /* Особый стиль для главной кнопки запуска проверки */
+    # 🔥 Особый стиль для главной кнопки запуска (Кнопка "Начать проверку")
     div.stButton > button[key="start_btn"] {
-        background: linear-gradient(90deg, #ff416c, #ff4b2b) !important;
-        color: white !important;
-        font-size: 1.2rem !important;
+        background-color: #5932a6 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: 600 !important;
+        font-size: 1.05rem !important;
         width: 100% !important;
-        box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important;
+        padding: 0.5rem 0 !important;
+        box-shadow: 0 2px 4px rgba(89, 50, 166, 0.15) !important;
     }
     div.stButton > button[key="start_btn"]:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(255, 65, 108, 0.6) !important;
+        background-color: #4c2893 !important;
+        box-shadow: 0 4px 8px rgba(89, 50, 166, 0.25) !important;
     }
 
-    /* Стиль кнопки скачивания архива */
+    # Стиль для кнопки скачивания архива
     div.stDownloadButton > button {
-        background: linear-gradient(90deg, #11998e, #38ef7d) !important;
-        color: white !important;
-        border-radius: 12px !important;
+        background-color: #10b981 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: 600 !important;
         width: 100% !important;
-        font-size: 1.1rem !important;
-        box-shadow: 0 4px 15px rgba(56, 239, 125, 0.4) !important;
+    }
+    div.stDownloadButton > button:hover {
+        background-color: #059669 !important;
     }
     
-    /* Кастомные контейнеры (Glassmorphism effect) */
-    .css-1r6slb0, .stCheckbox, .stFileUploader {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 1.5rem;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(8px);
-        margin-bottom: 1rem;
+    /* Аккуратные рамки вокруг блоков */
+    .stFileUploader, .stCheckbox {
+        background-color: #ffffff;
+        padding: 1.2rem;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Использование кастомных заголовков вместо стандартных st.title
+# Заголовки сайта
 st.markdown('<h1 class="main-title">🚑 Majestic RP | Сортировщик EMS</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Профессиональная автоматическая сортировка скриншотов медицинских отчетов</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Автоматическая сортировка скриншотов медицинских отчетов</p>', unsafe_allow_html=True)
 
 # Инициализация состояний звука
 if "play_sound" not in st.session_state:
@@ -116,15 +123,15 @@ if "play_sound" not in st.session_state:
 if "upload_sound_triggered" not in st.session_state:
     st.session_state.upload_sound_triggered = False
 
-# Кнопка-переключатель звука (сделаем её аккуратной сверху)
-col1, col2, col3 = st.columns([1, 2, 1])
+# Кнопка звука (теперь она выглядит аккуратно и текст отлично читается)
+col1, col2, col3 = st.columns([1, 1.2, 1])
 with col2:
     if st.session_state.play_sound:
-        if st.button("🔊 Звук: ВКЛ", use_container_width=True):
+        if st.button("🔊 Уведомления: ВКЛ", use_container_width=True):
             st.session_state.play_sound = False
             st.rerun()
     else:
-        if st.button("🔇 Звук: ВЫКЛ", use_container_width=True):
+        if st.button("🔇 Уведомления: ВЫКЛ", use_container_width=True):
             st.session_state.play_sound = True
             st.rerun()
 
@@ -142,7 +149,7 @@ uploaded_files = st.file_uploader("Перетащите файлы скринш�
                                   type=["png", "jpg", "jpeg"], 
                                   accept_multiple_files=True)
 
-show_debug = st.checkbox("🔍 Показать распознанный текст для папки 'Другое' (дебаг)")
+show_debug = st.checkbox("🔍 Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
 
 if uploaded_files:
     # --- ЗВУК ПРИ ПОЯВЛЕНИИ КНОПКИ (ИЗ ПАПКИ sounds_start) ---
@@ -151,7 +158,7 @@ if uploaded_files:
         st.session_state.upload_sound_triggered = True  
     # --------------------------------------------------------
 
-    # Назначаем кнопке уникальный key="start_btn" для применения CSS стилей огненного градиента
+    st.write("") # Небольшой отступ
     if st.button("🚀 НАЧАТЬ ТОЧНУЮ СОРТИРОВКУ", key="start_btn"):
         zip_buffer = io.BytesIO()
         progress_bar = st.progress(0)
