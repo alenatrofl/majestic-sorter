@@ -6,18 +6,22 @@ import zipfile
 import io
 import os
 
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+# Указывайте путь к tesseract, только если вы точно уверены, что он там (для Linux/Docker)
+# Для Windows путь обычно: r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# На Streamlit Cloud эту строку лучше вообще закомментировать, если добавлен пакет в packages.txt
+if os.path.exists('/usr/bin/tesseract'):
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="📸")
 
 st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
 
-# Сверхточный список ключевых слов, учитывающий опечатки сканера букв
+# Сверхточный список ключевых слов
 FOLDERS = {
     "Мед_Справки": ["выдали", "справк", "справ", "псих", "физ", "спра", "спран"],
     "Лечение": ["вылечили", "вылеч", "лече", "лечи", "таблет","лечеви"],
-    "Реанимация": ["реанимировали", "реаним", "реани", "спасение", "спасен",],
+    "Реанимация": ["реанимировали", "реаним", "реани", "спасение", "спасен"],
     "Вакцинация": ["вакцинировали", "вакцин", "вакци", "привив", "ваки"]
 }
 
@@ -34,7 +38,8 @@ if uploaded_files:
         status_text = st.empty()
         debug_logs = []
         
-        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        # ИСПРАВЛЕНО: Убран некорректный 4-й аргумент False, заменен на именованный параметр allowZip64
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zip_file:
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Обработка: {uploaded_file.name} ({idx+1}/{len(uploaded_files)})")
                 
@@ -44,7 +49,7 @@ if uploaded_files:
                 if img is not None:
                     h, w, _ = img.shape
                     
-                    # Суженный и центрированный срез (отсекаем чат слева и бинды справа)
+                    # Суженный и центрированный срез
                     crop_center_bottom = img[int(h*0.65):int(h*0.96), int(w*0.35):int(w*0.65)]
                     
                     # Подготовка картинки к распознаванию
@@ -52,7 +57,7 @@ if uploaded_files:
                     gray_large = cv2.resize(gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
                     _, thresh = cv2.threshold(gray_large, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                     
-                    # Считываем и русский, и английский текст одновременно, чтобы не терять опечатки
+                    # Считываем текст
                     custom_config = r'--oem 3 --psm 6'
                     text = pytesseract.image_to_string(thresh, lang='rus+eng', config=custom_config).lower()
                     
@@ -63,7 +68,8 @@ if uploaded_files:
                             break
                     
                     if target_folder == "Другое":
-                        debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{text.strip()}`")
+                        clean_text = text.strip().replace('\n', ' ')
+                        debug_logs.append(f"**Файл:** {uploaded_file.name} | **Робот прочитал:** `{clean_text}`")
                     
                     uploaded_file.seek(0)
                     zip_file.writestr(os.path.join(target_folder, uploaded_file.name), uploaded_file.read())
@@ -71,6 +77,9 @@ if uploaded_files:
                 progress_bar.progress((idx + 1) / len(uploaded_files))
         
         status_text.text("✅ Сортировка успешно завершена!")
+        
+        # Смещаем указатель в начало буфера перед скачиванием
+        zip_buffer.seek(0)
         
         st.download_button(
             label="📥 Скачать готовый архив (ZIP)",
