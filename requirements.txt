@@ -1,0 +1,4 @@
+# cache-breaker-v1
+streamlit>=1.66.1
+opencv-python-headless
+pytesseract
