@@ -32,10 +32,83 @@ def play_random_sound_from_dir(directory_name):
 if os.path.exists('/usr/bin/tesseract'):
     pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="📸")
+# Конфигурация страницы
+st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_icon="🚑", layout="centered")
 
-st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
-st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
+# --- БЛОК КАСТОМНОГО CSS ДЛЯ КРАСОЧНОГО ДИЗАЙНА ---
+st.markdown("""
+    <style>
+    /* Настройка главного фона и шрифтов */
+    .stApp {
+        background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+        color: #f3f4f6;
+    }
+    
+    /* Красивый заголовок с градиентом */
+    .main-title {
+        font-size: 2.8rem !important;
+        font-weight: 800;
+        background: linear-gradient(90deg, #ef4444, #3b82f6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .sub-title {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Стилизация ВСЕХ кнопок в приложении */
+    div.stButton > button {
+        border-radius: 12px !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease-index !important;
+        border: none !important;
+    }
+
+    /* Особый стиль для главной кнопки запуска проверки */
+    div.stButton > button[key="start_btn"] {
+        background: linear-gradient(90deg, #ff416c, #ff4b2b) !important;
+        color: white !important;
+        font-size: 1.2rem !important;
+        width: 100% !important;
+        box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4) !important;
+    }
+    div.stButton > button[key="start_btn"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(255, 65, 108, 0.6) !important;
+    }
+
+    /* Стиль кнопки скачивания архива */
+    div.stDownloadButton > button {
+        background: linear-gradient(90deg, #11998e, #38ef7d) !important;
+        color: white !important;
+        border-radius: 12px !important;
+        width: 100% !important;
+        font-size: 1.1rem !important;
+        box-shadow: 0 4px 15px rgba(56, 239, 125, 0.4) !important;
+    }
+    
+    /* Кастомные контейнеры (Glassmorphism effect) */
+    .css-1r6slb0, .stCheckbox, .stFileUploader {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(8px);
+        margin-bottom: 1rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Использование кастомных заголовков вместо стандартных st.title
+st.markdown('<h1 class="main-title">🚑 Majestic RP | Сортировщик EMS</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Профессиональная автоматическая сортировка скриншотов медицинских отчетов</p>', unsafe_allow_html=True)
 
 # Инициализация состояний звука
 if "play_sound" not in st.session_state:
@@ -43,15 +116,19 @@ if "play_sound" not in st.session_state:
 if "upload_sound_triggered" not in st.session_state:
     st.session_state.upload_sound_triggered = False
 
-# Кнопка-переключатель звука
-if st.session_state.play_sound:
-    if st.button("🔊 Уведомления: ВКЛ (Нажмите, чтобы заглушить)"):
-        st.session_state.play_sound = False
-        st.rerun()
-else:
-    if st.button("🔇 Уведомления: ВЫКЛ (Нажмите, чтобы включить)"):
-        st.session_state.play_sound = True
-        st.rerun()
+# Кнопка-переключатель звука (сделаем её аккуратной сверху)
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    if st.session_state.play_sound:
+        if st.button("🔊 Звук: ВКЛ", use_container_width=True):
+            st.session_state.play_sound = False
+            st.rerun()
+    else:
+        if st.button("🔇 Звук: ВЫКЛ", use_container_width=True):
+            st.session_state.play_sound = True
+            st.rerun()
+
+st.write("---")
 
 # Сверхточный список ключевых слов
 FOLDERS = {
@@ -61,11 +138,11 @@ FOLDERS = {
     "Вакцинация": ["вакцинировали", "вакцин", "вакци", "привив", "ваки"]
 }
 
-uploaded_files = st.file_uploader("Перетащите скриншоты сюда", 
+uploaded_files = st.file_uploader("Перетащите файлы скриншотов сюда", 
                                   type=["png", "jpg", "jpeg"], 
                                   accept_multiple_files=True)
 
-show_debug = st.checkbox("Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
+show_debug = st.checkbox("🔍 Показать распознанный текст для папки 'Другое' (дебаг)")
 
 if uploaded_files:
     # --- ЗВУК ПРИ ПОЯВЛЕНИИ КНОПКИ (ИЗ ПАПКИ sounds_start) ---
@@ -74,7 +151,8 @@ if uploaded_files:
         st.session_state.upload_sound_triggered = True  
     # --------------------------------------------------------
 
-    if st.button("🚀 Начать точную сортировку"):
+    # Назначаем кнопке уникальный key="start_btn" для применения CSS стилей огненного градиента
+    if st.button("🚀 НАЧАТЬ ТОЧНУЮ СОРТИРОВКУ", key="start_btn"):
         zip_buffer = io.BytesIO()
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -82,7 +160,7 @@ if uploaded_files:
         
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zip_file:
             for idx, uploaded_file in enumerate(uploaded_files):
-                status_text.text(f"Обработка: {uploaded_file.name} ({idx+1}/{len(uploaded_files)})")
+                status_text.markdown(f"⏳ **Обработка:** `{uploaded_file.name}` ({idx+1}/{len(uploaded_files)})")
                 
                 file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
                 img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
@@ -114,7 +192,7 @@ if uploaded_files:
                 
                 progress_bar.progress((idx + 1) / len(uploaded_files))
         
-        status_text.text("✅ Сортировка успешно завершена!")
+        status_text.markdown("### 🎉 Сортировка успешно завершена!")
         
         # --- ЗВУК ПОСЛЕ ЗАВЕРШЕНИЯ ПРОВЕРКИ (ИЗ ПАПКИ sounds_end) ---
         if st.session_state.play_sound:
@@ -123,8 +201,9 @@ if uploaded_files:
         
         zip_buffer.seek(0)
         
+        st.markdown("<br>", unsafe_allow_html=True)
         st.download_button(
-            label="📥 Скачать готовый архив (ZIP)",
+            label="📥 СКАЧАТЬ ГОТОВЫЙ АРХИВ (ZIP)",
             data=zip_buffer.getvalue(),
             file_name="sorted_screenshots.zip",
             mime="application/zip"
