@@ -6,7 +6,27 @@ import zipfile
 import io
 import os
 import random
-import base64  # <--- Добавили для скрытого воспроизведения звука
+import base64
+
+# Универсальная функция для скрытого воспроизведения звука из указанной папки
+def play_random_sound_from_dir(directory_name):
+    if os.path.exists(directory_name):
+        sound_files = [f for f in os.listdir(directory_name) if f.endswith(('.mp3', '.wav', '.ogg'))]
+        if sound_files:
+            random_sound = random.choice(sound_files)
+            sound_path = os.path.join(directory_name, random_sound)
+            
+            with open(sound_path, "rb") as f:
+                audio_bytes = f.read()
+            audio_base64 = base64.b64encode(audio_bytes).decode()
+            format_ext = random_sound.split('.')[-1]
+            
+            audio_html = f"""
+                <audio autoplay style="display:none;">
+                    <source src="data:audio/{format_ext};base64,{audio_base64}" type="audio/{format_ext}">
+                </audio>
+            """
+            st.markdown(audio_html, unsafe_allow_html=True)
 
 # Указывайте путь к tesseract, только если вы точно уверены, что он там (для Linux/Docker)
 if os.path.exists('/usr/bin/tesseract'):
@@ -17,9 +37,11 @@ st.set_page_config(page_title="Majestic RP Сортировщик EMS", page_ico
 st.title("📸 Сортировщик скриншотов Majestic RP (EMS)")
 st.write("Загрузите скриншоты, и сайт автоматически разложит их по папкам внутри ZIP-архива.")
 
-# --- БЛОК УПРАВЛЕНИЯ ЗВУКОМ ---
+# Инициализация состояний звука
 if "play_sound" not in st.session_state:
-    st.session_state.play_sound = True  # По умолчанию звук включен
+    st.session_state.play_sound = True
+if "upload_sound_triggered" not in st.session_state:
+    st.session_state.upload_sound_triggered = False
 
 # Кнопка-переключатель звука
 if st.session_state.play_sound:
@@ -30,7 +52,6 @@ else:
     if st.button("🔇 Уведомления: ВЫКЛ (Нажмите, чтобы включить)"):
         st.session_state.play_sound = True
         st.rerun()
-# ------------------------------
 
 # Сверхточный список ключевых слов
 FOLDERS = {
@@ -47,6 +68,12 @@ uploaded_files = st.file_uploader("Перетащите скриншоты сю�
 show_debug = st.checkbox("Показать распознанный текст для папки 'Другое' (для поиска ошибок)")
 
 if uploaded_files:
+    # --- ЗВУК ПРИ ПОЯВЛЕНИИ КНОПКИ (ИЗ ПАПКИ sounds_start) ---
+    if st.session_state.play_sound and not st.session_state.upload_sound_triggered:
+        play_random_sound_from_dir("sounds_start")
+        st.session_state.upload_sound_triggered = True  
+    # --------------------------------------------------------
+
     if st.button("🚀 Начать точную сортировку"):
         zip_buffer = io.BytesIO()
         progress_bar = st.progress(0)
@@ -89,29 +116,10 @@ if uploaded_files:
         
         status_text.text("✅ Сортировка успешно завершена!")
         
-        # --- СКРЫТОЕ ПРОИГРЫВАНИЕ СЛУЧАЙНОГО ЗВУКА ---
+        # --- ЗВУК ПОСЛЕ ЗАВЕРШЕНИЯ ПРОВЕРКИ (ИЗ ПАПКИ sounds_end) ---
         if st.session_state.play_sound:
-            SOUNDS_DIR = "sounds"
-            if os.path.exists(SOUNDS_DIR):
-                sound_files = [f for f in os.listdir(SOUNDS_DIR) if f.endswith(('.mp3', '.wav', '.ogg'))]
-                if sound_files:
-                    random_sound = random.choice(sound_files)
-                    sound_path = os.path.join(SOUNDS_DIR, random_sound)
-                    
-                    # Кодируем аудио в base64 для незаметной вставки в HTML
-                    with open(sound_path, "rb") as f:
-                        audio_bytes = f.read()
-                    audio_base64 = base64.b64encode(audio_bytes).decode()
-                    format_ext = random_sound.split('.')[-1]
-                    
-                    # Встраиваем скрытый аудио-тег с автозапуском
-                    audio_html = f"""
-                        <audio autoplay style="display:none;">
-                            <source src="data:audio/{format_ext};base64,{audio_base64}" type="audio/{format_ext}">
-                        </audio>
-                    """
-                    st.markdown(audio_html, unsafe_allow_html=True)
-        # ----------------------------------------------
+            play_random_sound_from_dir("sounds_end")
+        # -----------------------------------------------------------
         
         zip_buffer.seek(0)
         
@@ -127,3 +135,5 @@ if uploaded_files:
             st.subheader("🔍 Анализ нераспознанных файлов:")
             for log in debug_logs:
                 st.markdown(log)
+else:
+    st.session_state.upload_sound_triggered = False
